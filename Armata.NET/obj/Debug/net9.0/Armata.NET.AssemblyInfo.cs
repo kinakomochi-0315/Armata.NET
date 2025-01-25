@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Armata.NET")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+12a107219e91d7f31adff3234399b975e2343654")]
 [assembly: System.Reflection.AssemblyProductAttribute("Armata.NET")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Armata.NET")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

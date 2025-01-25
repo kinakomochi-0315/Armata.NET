@@ -127,43 +127,43 @@ public class Arduino(string portName, int baudRate = 57600)
         }
     }
 
-    private void SetDigitalState(int port, (int, int) state)
+    private void ReadDigitalState(int port)
     {
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(port, DIGITAL_PORT_COUNT);
+        var pinStates = ReadCommand(2).ToArray();
 
         // 0~7ビット目を読み取る
         for (var i = 0; i < 7; i++)
         {
             var idx = port * 8 + i;
-            var value = state.Item1 >> i & 1;
+            var value = pinStates[0] >> i & 1;
             _digitalStates[idx] = (PinState)value;
         }
 
         // 8ビット目を読み取る
-        _digitalStates[(port + 1) * 8 - 1] = (PinState)(state.Item2 & 1);
+        _digitalStates[(port + 1) * 8 - 1] = (PinState)(pinStates[1] & 1);
     }
 
-    private void SetAnalogState(int pin, (int, int) state)
+    private void ReadAnalogValue(int pin)
     {
-        var value = state.Item2 << 7 | state.Item1;
+        var state = ReadCommand(2).ToArray();
+        var value = state[1] << 7 | state[0];
+
         _analogStates[pin] = value;
     }
 
-    private (int command, int[] data) ReadSysexCommand()
+    private IEnumerable<int> ReadSysexArgs()
     {
-        var sysexCommand = _serialPort.ReadByte();
-
-        // sysExコマンドの最後(0xF7)まで読み取る
-        var sysexData = new List<int>();
-
         while (true)
         {
             var data = _serialPort.ReadByte();
-            if (data == 0xF7) break;
-            sysexData.Add(data);
-        }
 
-        return (sysexCommand, sysexData.ToArray());
+            if (data == 0xF7)
+            {
+                yield break;
+            }
+
+            yield return data;
+        }
     }
 
     private IEnumerable<int> ReadCommand(int count)
@@ -182,27 +182,25 @@ public class Arduino(string portName, int baudRate = 57600)
 
             Console.WriteLine($"Received command: {command:X}");
 
-            if (command == 0xF0) // sysexコマンド
-            {
-                var (sysexCommand, sysexData) = ReadSysexCommand();
-
-                // TODO: sysexコマンドの処理
-
-                continue;
-            }
-
             switch (command)
             {
-                case >= 0x90 and <= 0x9F: // デジタルIOメッセージ
-                    var pinStates = ReadCommand(2).ToArray();
-                    Console.WriteLine($"デジタル入力: ${pinStates[0]:X}, ${pinStates[1]:X}");
-                    SetDigitalState(command - 0x90, (pinStates[0], pinStates[1]));
+                case 0xF0: // SysExコマンド
+                {
+                    var sysExCommand = _serialPort.ReadByte();
+                    var sysExData = ReadSysexArgs().ToArray();
+
+                    continue;
+                }
+                case >= 0x90 and <= 0x9F: // デジタルピン状態通知
+                {
+                    ReadDigitalState(command - 0x90);
                     break;
-                case >= 0xE0 and <= 0xEF: // アナログIOメッセージ
-                    var analogValue = ReadCommand(2).ToArray();
-                    Console.WriteLine($"アナログ入力: ${analogValue[0]:X}, ${analogValue[1]:X}");
-                    SetAnalogState(command - 0xA0, (analogValue[0], analogValue[1]));
+                }
+                case >= 0xE0 and <= 0xEF: // アナログピン状態通知
+                {
+                    ReadAnalogValue(command - 0xA0);
                     break;
+                }
             }
         }
 
