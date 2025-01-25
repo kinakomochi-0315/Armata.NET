@@ -8,7 +8,6 @@ public enum PinMode
     Output = 0x01, // 出力
     Analog = 0x02, // アナログ入力
     PwmOut = 0x03, // PWM出力
-    Servo = 0x04,  // サーボモータ
 }
 
 public class Arduino(string portName, int baudRate = 57600)
