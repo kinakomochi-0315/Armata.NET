@@ -14,9 +14,14 @@ public class Arduino(string portName, int baudRate = 57600)
 {
     private const int DIGITAL_PORT_COUNT = 8;
     private const int ANALOG_PIN_COUNT = 16;
+
+    private const int SYSEX_BEGIN = 0xF0;
+    private const int SYSEX_END = 0xF7;
+    private const int DIGITAL_MESSAGE = 0x90;
+    private const int ANALOG_MESSAGE = 0xE0;
+
     private readonly int[] _analogStates = new int[ANALOG_PIN_COUNT];
     private readonly PinState[] _digitalStates = new PinState[DIGITAL_PORT_COUNT * 8];
-
     private readonly SerialPort _serialPort = new(portName, baudRate);
 
     public bool IsConnected => _serialPort.IsOpen;
@@ -57,13 +62,17 @@ public class Arduino(string portName, int baudRate = 57600)
         switch (mode)
         {
             case NET.PinMode.Input:
+            {
                 var digitalNotifyReq = new byte[] { (byte)(0xD0 + GetPort(pin)), 1 };
                 _serialPort.Write(digitalNotifyReq, 0, digitalNotifyReq.Length);
                 break;
+            }
             case NET.PinMode.Analog:
+            {
                 var analogNotifyReq = new byte[] { (byte)(0xC0 + pin), 1 };
                 _serialPort.Write(analogNotifyReq, 0, analogNotifyReq.Length);
                 break;
+            }
         }
     }
 
@@ -76,7 +85,7 @@ public class Arduino(string portName, int baudRate = 57600)
 
         CheckSerialPortIsValid();
 
-        var bytes = new byte[] { 0xF5, pin, (byte)state };
+        var bytes = new byte[] { DIGITAL_MESSAGE, pin, (byte)state };
         _serialPort.Write(bytes, 0, bytes.Length);
     }
 
@@ -115,7 +124,7 @@ public class Arduino(string portName, int baudRate = 57600)
 
         CheckSerialPortIsValid();
 
-        var bytes = new[] { (byte)(0xE0 + pin), (byte)(value % 127), (byte)(value >> 7) };
+        var bytes = new[] { (byte)(ANALOG_MESSAGE + pin), (byte)(value % 127), (byte)(value >> 7) };
         _serialPort.Write(bytes, 0, bytes.Length);
     }
 
@@ -157,7 +166,7 @@ public class Arduino(string portName, int baudRate = 57600)
         {
             var data = _serialPort.ReadByte();
 
-            if (data == 0xF7)
+            if (data == SYSEX_END)
             {
                 yield break;
             }
@@ -184,19 +193,19 @@ public class Arduino(string portName, int baudRate = 57600)
 
             switch (command)
             {
-                case 0xF0: // SysExコマンド
+                case SYSEX_BEGIN: // SysExコマンド
                 {
                     var sysExCommand = _serialPort.ReadByte();
                     var sysExData = ReadSysexArgs().ToArray();
 
                     continue;
                 }
-                case >= 0x90 and <= 0x9F: // デジタルピン状態通知
+                case >= DIGITAL_MESSAGE and <= DIGITAL_MESSAGE + 0xF: // デジタルピン状態通知
                 {
                     ReadDigitalState(command - 0x90);
                     break;
                 }
-                case >= 0xE0 and <= 0xEF: // アナログピン状態通知
+                case >= ANALOG_MESSAGE and <= ANALOG_MESSAGE + 0xF: // アナログピン状態通知
                 {
                     ReadAnalogValue(command - 0xA0);
                     break;
