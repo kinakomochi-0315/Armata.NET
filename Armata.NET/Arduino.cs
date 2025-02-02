@@ -18,6 +18,24 @@ public class Arduino(string portName, int baudRate = 57600)
 
     private const int SYSEX_BEGIN = 0xF0;
     private const int SYSEX_END = 0xF7;
+    private const int SYSEX_ANALOG_MAPPING_QUERY = 0x69;
+    private const int SYSEX_ANALOG_MAPPING_RESPONSE = 0x6A;
+    private const int SYSEX_CAPABILITY_QUERY = 0x6B;
+    private const int SYSEX_CAPABILITY_RESPONSE = 0x6C;
+    private const int SYSEX_PIN_STATE_QUERY = 0x6D;
+    private const int SYSEX_PIN_STATE_RESPONSE = 0x6E;
+    private const int SYSEX_EXTENDED_ANALOG = 0x6F;
+    private const int SYSEX_SERVO_CONFIG = 0x70;
+    private const int SYSEX_STRING_DATA = 0x71;
+    private const int SYSEX_SHIFT_DATA = 0x75;
+    private const int SYSEX_IIC_REQUEST = 0x76;
+    private const int SYSEX_IIC_REPLY = 0x77;
+    private const int SYSEX_IIC_CONFIG = 0x78;
+    private const int SYSEX_REPORT_FIRMWARE = 0x79;
+    private const int SYSEX_SAMPLING_INTERVAL = 0x7A;
+    private const int SYSEX_NON_REALTIME = 0x7E;
+    private const int SYSEX_REALTIME = 0x7F;
+
     private const int DIGITAL_MESSAGE = 0x90;
     private const int ANALOG_MESSAGE = 0xE0;
 
@@ -26,6 +44,12 @@ public class Arduino(string portName, int baudRate = 57600)
     private readonly SerialPort _serialPort = new(portName, baudRate);
 
     public bool IsConnected => _serialPort.IsOpen;
+
+    /// <summary>
+    /// 利用可能なシリアルポートの名前を取得します。
+    /// </summary>
+    /// <returns></returns>
+    public static string[] GetPortNames() => SerialPort.GetPortNames();
 
     /// <summary>
     /// Firmataプロトコルにおいてデジタルピンの状態を取得・設定するために使用されるポートという単位に
@@ -65,7 +89,10 @@ public class Arduino(string portName, int baudRate = 57600)
     public void Connect()
     {
         _serialPort.Open();
+        DebugConsole.Info("Arduino接続成功");
+
         Task.Run(SerialReceivingTask);
+        DebugConsole.Info("Arduinoからのデータ受信を開始");
     }
 
     /// <summary>
@@ -80,6 +107,8 @@ public class Arduino(string portName, int baudRate = 57600)
 
         _serialPort.Close();
         _serialPort.Dispose();
+
+        DebugConsole.Info("Arduinoとの接続を切断");
     }
 
     /// <summary>
@@ -102,22 +131,21 @@ public class Arduino(string portName, int baudRate = 57600)
         }
 
         // ピンのモードを設定
-        var modeReq = new byte[] { 0xF4, (byte)pin, (byte)mode };
-        _serialPort.Write(modeReq, 0, modeReq.Length);
+        Write(0xF4, (byte)pin, (byte)mode);
 
-        // そのピンの状態が変更されたときに通知するようリクエスト
         switch (mode)
         {
+            // 入力系のピンの場合、ピンの状態を通知するように設定
             case NET.PinMode.Input:
             {
-                byte[] digitalNotifyReq = [(byte)(0xD0 + GetPort(pin)), 1];
-                _serialPort.Write(digitalNotifyReq, 0, digitalNotifyReq.Length);
+                var command = (byte)(0xD0 + GetPort(pin));
+                Write(command, 1);
                 break;
             }
             case NET.PinMode.Analog:
             {
-                byte[] analogNotifyReq = [(byte)(0xC0 + pin), 1];
-                _serialPort.Write(analogNotifyReq, 0, analogNotifyReq.Length);
+                var command = (byte)(0xC0 + pin);
+                Write(command, 1);
                 break;
             }
         }
@@ -143,8 +171,7 @@ public class Arduino(string portName, int baudRate = 57600)
             throw new InvalidOperationException("Not connected to Arduino, please call Connect() method to connect.");
         }
 
-        byte[] digitalWriteReq = [DIGITAL_MESSAGE, (byte)pin, (byte)state];
-        _serialPort.Write(digitalWriteReq, 0, digitalWriteReq.Length);
+        Write(0xF5, (byte)pin, (byte)state);
     }
 
     /// <summary>
@@ -170,6 +197,13 @@ public class Arduino(string portName, int baudRate = 57600)
         return _digitalStates[pin];
     }
 
+    /// <summary>
+    /// アナログピンの値を取得します。
+    /// </summary>
+    /// <param name="analogPin">状態を取得するアナログピンの番号</param>
+    /// <returns>アナログピンの値</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Firmataプロトコルのアナログピンの範囲(0~15)を超えた範囲を指定した場合</exception>
+    /// <exception cref="InvalidOperationException">Arduinoに接続していない状態でこの関数を呼び出したとき</exception>
     public int AnalogRead(int analogPin)
     {
         if (analogPin is not (>= 0 and < DIGITAL_PIN_COUNT))
@@ -201,8 +235,14 @@ public class Arduino(string portName, int baudRate = 57600)
             throw new InvalidOperationException("Not connected to Arduino, please call Connect() method to connect.");
         }
 
-        byte[] bytes = [(byte)(ANALOG_MESSAGE + pin), ..SplitBytes(value)];
-        _serialPort.Write(bytes, 0, bytes.Length);
+        var command = (byte)(ANALOG_MESSAGE + pin);
+        Write([command, ..SplitBytes(value)]);
+    }
+
+    private void Write(params byte[] data)
+    {
+        DebugConsole.Debug($"Write data: {data.ToHexString()}");
+        _serialPort.Write(data, 0, data.Length);
     }
 
     private void ReadDigitalState(int port)
@@ -251,7 +291,7 @@ public class Arduino(string portName, int baudRate = 57600)
         {
             var command = _serialPort.ReadByte();
 
-            Console.WriteLine($"Received command: {command:X}");
+            DebugConsole.Debug($"コマンド受信: 0x{command:X2}");
 
             switch (command)
             {
@@ -259,6 +299,8 @@ public class Arduino(string portName, int baudRate = 57600)
                 {
                     var sysExCommand = _serialPort.ReadByte();
                     var sysExData = ReadSysexArgs().ToArray();
+
+                    DebugConsole.Debug($"SysExコマンド受信: 0x{sysExCommand:X2}, データ: {sysExData.ToHexString()}");
 
                     continue;
                 }

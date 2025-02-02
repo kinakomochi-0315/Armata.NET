@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Armata.NET", "Armata.NET\Armata.NET.csproj", "{8AB80649-397E-4A89-ABA8-62F9B105358D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp", "ConsoleApp\ConsoleApp.csproj", "{98C328B8-8C76-4C7A-83AC-6813D777AB4C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{8AB80649-397E-4A89-ABA8-62F9B105358D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8AB80649-397E-4A89-ABA8-62F9B105358D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8AB80649-397E-4A89-ABA8-62F9B105358D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{98C328B8-8C76-4C7A-83AC-6813D777AB4C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{98C328B8-8C76-4C7A-83AC-6813D777AB4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{98C328B8-8C76-4C7A-83AC-6813D777AB4C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{98C328B8-8C76-4C7A-83AC-6813D777AB4C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
